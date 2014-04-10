@@ -777,6 +777,16 @@ static void keyzen_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mo
 	}
 }
 
+static void keyzen_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, size_t size)
+{
+	(void)name;
+	if (size == 0)
+		fuse_reply_xattr(req, 1);
+	else
+		fuse_reply_buf(req, "*", 1);
+}
+
+
 
 
 /*
@@ -793,6 +803,7 @@ static struct fuse_lowlevel_ops keyzen_oper = {
 	.releasedir	= keyzen_releasedir,
 	.unlink		= keyzen_unlink,
 	.mknod		= keyzen_mknod,
+	.getxattr	= keyzen_getxattr
 };
 
 int main(int argc, char *argv[])
