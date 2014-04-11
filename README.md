@@ -17,7 +17,29 @@ What does it contain?
 
 This project provides:
  - A manager of permissions that is accessed via the filesystem
- - a library for interacting with the manager through the filesystem
+ - a C/DBUS/GLIB library for interacting with the manager through
+   the filesystem
+
+Installation
+------------
+
+```
+# install and compile
+git clone https://github.com/jobol/keyzen
+cd keyzen/src
+make
+```
+
+Launching the filesystem
+------------------------
+
+To launch it for example to the directory /tmp/keyzen, type
+```
+cd keyzen/src
+make
+mkdir /tmp/keyzen
+./keyzen-fs /tmp/keyzen
+```
 
 Examples of use
 ---------------
@@ -60,7 +82,7 @@ the idea to add itself the permission 'application.launch' is
 to issue the command `touch /sys/fs/keyzen/self/application.launch`. 
 Here again, it wouldn't work because 'touch' is run as an other procces.
 
-For C programs, it will be `mknod("/sys/fs/keyzen/self/application.launch", S_IFREG,, 0)`.
+For C programs, it will be `mknod("/sys/fs/keyzen/self/application.launch", S_IFREG, 0)`.
 
 At startup, the processes are gaining the permission keys
 set in the extended security attribute of name 
