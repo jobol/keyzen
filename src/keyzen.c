@@ -498,7 +498,7 @@ int keyzen_self_set_keys(const char **keys, int count)
 
 	result = 0;
 	dropadmin = 0;
-	for (i = 0 ; !result && i < count ; i++) {
+	for (i = 0 ; !result && i < entries_array_count ; i++) {
 		switch (entries_array[i].flag & (FLAG_KEEP|FLAG_EXIST)) {
 		case FLAG_EXIST:
 			if (!strcmp(entries_array[i].entry, adminkey)) {
