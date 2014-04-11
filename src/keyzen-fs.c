@@ -1,3 +1,5 @@
+/* 2014, Copyright Intel & Jose Bollo <jose.bollo@open.eurogiciel.org>, license MIT */
+
 #define FUSE_USE_VERSION 26
 
 #include <fuse_lowlevel.h>

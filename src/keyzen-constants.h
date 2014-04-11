@@ -1,3 +1,5 @@
+/* 2014, Copyright Intel & Jose Bollo <jose.bollo@open.eurogiciel.org>, license MIT */
+
 #ifndef KEYZEN_CONSTANTS_H
 #define KEYZEN_CONSTANTS_H
 

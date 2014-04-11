@@ -1,3 +1,5 @@
+/* 2014, Copyright Intel & Jose Bollo <jose.bollo@open.eurogiciel.org>, license MIT */
+
 int keyset_new();
 void keyset_delete(int ks);
 int keyset_is_valid(int ks);
