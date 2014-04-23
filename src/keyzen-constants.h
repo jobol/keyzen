@@ -5,6 +5,7 @@
 
 #define KEYZEN_FS_KEY      "keyzen-fs"
 #define KEYZEN_SELF_NAME   "self"
+#define KEYZEN_DIAL_NAME   "dial"
 #define KEYZEN_XATTR_KEY   "security.keyzen"
 #define KEYZEN_ADMIN_KEY   "keyzen.admin"
 

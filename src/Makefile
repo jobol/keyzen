@@ -1,17 +1,17 @@
 .PHONY: all clean
 
-all: keyzen-fs libkeyzen.a libkeyzen-dbus.a
+all: keyzen-fs keyzen libkeyzen.a libkeyzen-dbus.a
 
 clean:
 	$(RM) *.o *.a keyzen-fs
 
-SRCFS = procs.c keyset.c genname.c
+SRCFS = procs.c keyset.c
 
-INCFS = procs.h keyset.h genname.h
+INCFS = procs.h keyset.h itoa.c
 
 OPTFS = $(shell pkg-config --cflags fuse) $(shell pkg-config --libs fuse)
 
-OPTFS += -O3 -Wall 
+OPTFS += -g -Wall 
 
 keyzen-fs: keyzen-fs.c $(SRCFS) $(INCFS)
 	gcc $(OPTFS) -o $@ $< $(SRCFS)
@@ -28,6 +28,7 @@ keyzen-dbus.o: keyzen-dbus.c
 libkeyzen-dbus.a: keyzen-dbus.o
 	$(AR) rcs $@ $^
 
-
+keyzen: keyzen-tool.c
+	gcc $(OPTFS) -o $@ $< $(SRCFS)
 
 

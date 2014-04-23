@@ -7,29 +7,93 @@
 #include <errno.h>
 #include <assert.h>
 
-	
+#include "keyset.h"
+
 static int tag_count = 0;
 static char **tag_strings = 0;
 static int *tag_indexes = 0;
 
 static int keyset_count = 0;
-static int keyset_size = 0;
-static unsigned *keysets = 0;
+static int keyset_size = 1;
+static int *keysets = 0;
+static int keyset_free = -1;
 
-static unsigned *keyuses = 0;
-static int keyset_iter = 0;
-static int keyset_free = 0;
+#define ispow2(x)   (!((x) & ((x) - 1)))
 
-#define BITU      (CHAR_BIT * sizeof(unsigned))
-#define sneed(x)  (((x) + (BITU-1)) & ~(BITU-1))
+#define ALLOC_KEYSET_COUNT	16 /* count of keyset to reserve by alloc */
+#define ALLOC_TAG_COUNT		16 /* count of tag to reserve by alloc, MUST be a power of 2 AND greater or equal to sizeof(int) */
+
+#define sneed(x)	(assert(ispow2(ALLOC_TAG_COUNT)), (((x) + (ALLOC_TAG_COUNT-1)) & ~(ALLOC_TAG_COUNT-1)))
+
+#define adrks(ks)  ((char*)(keysets + ((ks) * keyset_size)))
+
+static int extend_keyset_size(int tagcnt)
+{
+	int size, i, j;
+	int *p, *r;
+
+	assert((tagcnt % sizeof * keysets) == 0);
+
+	size = (tagcnt * sizeof(char) + (sizeof * keysets - 1)) / sizeof * keysets;
+
+	if (keyset_count && size > keyset_size) {
+		p = realloc(keysets, keyset_count * size * sizeof * keysets);
+		if (!p)
+			return -ENOMEM;
+
+		keysets = p;
+		r = p + keyset_count * keyset_size;
+		p = p + keyset_count * size;
+		i = keyset_count;
+		while (i) {
+			i--;
+			p -= size;
+			r -= keyset_size;
+			j = size;
+			while (keyset_size < j)
+				p[--j] = 0;
+			while (j) {
+				j--;
+				p[j] = r[j];
+			}
+		}
+	}
+	keyset_size = size;
+	return 0;
+}
+
+static int reserve_tag_count(int tagcnt)
+{
+	int ns, s;
+	void *p;
+
+	/* grows on need */
+	ns = sneed(tagcnt);
+	s = sneed(tag_count);
+	if (ns > s) {
+		s = extend_keyset_size(ns);
+		if (s)
+			return s;
+		p = realloc(tag_strings, ns * sizeof * tag_strings);
+		if (!p)
+			return -ENOMEM;
+		tag_strings = p;
+		p = realloc(tag_indexes, ns * sizeof * tag_indexes);
+		if (!p)
+			return -ENOMEM;
+		tag_indexes = p;
+	}
+	return 0;
+}
 
 static int get_tag(const char *tag, int create)
 {
 	int i, k, l, u, d;
-	void *p;
 	char *s;
 
-	/* search */
+	assert(tag);
+
+	/* dichotomic search */
 	l = 0;
 	u = tag_count;
 	while (l < u)
@@ -49,37 +113,10 @@ static int get_tag(const char *tag, int create)
 	if (!create)
 		return -ENOENT;
 
-	/* grows on need */
-	d = sneed(tag_count + 1);
-	if (d != sneed(tag_count)) {
-		p = realloc(tag_strings, d * sizeof * tag_strings);
-		if (!p)
-			return -ENOMEM;
-		tag_strings = p;
-		p = realloc(tag_indexes, d * sizeof * tag_indexes);
-		if (!p)
-			return -ENOMEM;
-		tag_indexes = p;
-		d /= BITU;
-		p = realloc(keysets, keyset_count * d * sizeof * keysets);
-		if (!p)
-			return -ENOMEM;
-		keysets = p;
-		i = keyset_count;
-		while (i) {
-			i--;
-			l = d;
-			while (keyset_size < l) {
-				l--;
-				keysets[i * d + l] = 0;
-			}
-			while (l) {
-				l--;
-				keysets[i * d + l] = keysets[i * keyset_size + l];
-			}
-		}
-		keyset_size = d;
-	}
+	/* reserve memory */
+	l = reserve_tag_count(tag_count + 1);
+	if (l)
+		return l;
 
 	/* allocation */
 	s = strdup(tag);
@@ -95,13 +132,24 @@ static int get_tag(const char *tag, int create)
 	return k;
 }
 
+static int is_keyset_free(int ks)
+{
+	int iter;
 
-
+	assert(0 <= ks && ks < keyset_count);
+	iter = keyset_free;
+	while (iter >= 0)
+		if (iter == ks)
+			return 1;
+		else
+			iter = keysets[iter * keyset_size];
+	return 0;
+}
 
 
 int keyset_is_valid(int ks)
 {
-	return 0 <= ks && ks < keyset_count && !!(keyuses[ks / BITU] & (1U << (ks % BITU)));
+	return 0 <= ks && ks < keyset_count && !is_keyset_free(ks);
 }
 
 int keyset_keyid(const char *key, int create)
@@ -123,120 +171,94 @@ const char *keyset_key(int kid)
 	return tag_strings[kid];
 }
 
-int keyset_add(int ks, const char *key)
-{
-	int idx;
 
-	assert(key);
-	assert(keyset_is_valid(ks));
 
-	idx = get_tag(key, 1);
-	if (idx < 0)
-		return idx;
 
-	keysets[ks * keyset_size + (idx / BITU)] |= 1U << (idx % BITU);
-	return 0;
-}
-
-int keyset_sub(int ks, const char *key)
-{
-	int idx;
-
-	assert(key);
-	assert(keyset_is_valid(ks));
-
-	idx = get_tag(key, 0);
-	if (idx < 0)
-		return idx;
-
-	keysets[ks * keyset_size + (idx / BITU)] &= ~(1U << (idx % BITU));
-	return 0;
-}
-
-int keyset_has(int ks, const char *key)
-{
-	int idx;
-
-	assert(key);
-	assert(keyset_is_valid(ks));
-
-	idx = get_tag(key, 0);
-	if (idx < 0)
-		return 0;
-
-	return !!(keysets[ks * keyset_size + (idx / BITU)] & (1U << (idx % BITU)));
-}
-
-int keyset_has_keyid(int ks, int kid)
+void keyset_set(int ks, int kid, char value)
 {
 	assert(keyset_is_valid(ks));
 	assert(keyset_is_valid_keyid(kid));
 
-	return !!(keysets[ks * keyset_size + (kid / BITU)] & (1U << (kid % BITU)));
+	adrks(ks)[kid] = value;
 }
+
+char keyset_get(int ks, int kid)
+{
+	assert(keyset_is_valid(ks));
+	assert(keyset_is_valid_keyid(kid));
+
+	return adrks(ks)[kid];
+}
+
+
+
+
 
 int keyset_new()
 {
+	int r;
 	int n;
 	void *p;
 
-	if (!keyset_free) {
-		n = keyset_count / BITU;
-		p = realloc(keyuses, (n + 1) * sizeof * keyuses);
-		if (!p)
-			return -ENOMEM;
-		keyuses = p;
-		keyuses[n] = 0;
-		p = realloc(keysets, (keyset_count + BITU) * keyset_size * sizeof * keysets);
+	if (keyset_free < 0) {
+		n = keyset_count + ALLOC_KEYSET_COUNT;
+		p = realloc(keysets, n * keyset_size * sizeof * keysets);
 		if (!p)
 			return -ENOMEM;
 		keysets = p;
-		keyset_count += BITU;
-		keyset_free = BITU;
+		while (keyset_count < n) {
+			keysets[keyset_count * keyset_size] = keyset_free;
+			keyset_free = keyset_count++;
+		}
 	}
-
-	while (!~keyuses[keyset_iter / BITU])
-		keyset_iter = ((keyset_iter & ~(BITU - 1)) + BITU) % keyset_count;
-	while (keyuses[keyset_iter / BITU] & (1U << (keyset_iter % BITU)))
-		keyset_iter = (keyset_iter + 1) % keyset_count;
-
-	memset(keysets + keyset_iter * keyset_size, 0, keyset_size * sizeof * keysets);
-	keyuses[keyset_iter / BITU] |= (1U << (keyset_iter % BITU));
-	keyset_free--;
-	return keyset_iter;
+	r = keyset_free;
+	keyset_free = keysets[r * keyset_size];
+	memset(adrks(r), 0, keyset_size * sizeof * keysets);
+	return r;
 }
 
 void keyset_delete(int ks)
 {
 	assert(keyset_is_valid(ks));
-	
-	keyuses[ks / BITU] &= ~(1U << (ks % BITU));
-	keyset_free++;
+
+	keysets[ks * keyset_size] = keyset_free;
+	keyset_free = ks;
 }
 
 void keyset_for_all_key(void (*cb)(const char*,int,void*), void *extra)
 {
-	int i;
+	int kid;
 
-	for (i = 0 ; i < tag_count ; i ++)
-		cb(tag_strings[i], i, extra);
+	for (kid = 0 ; kid < tag_count ; kid++)
+		cb(tag_strings[kid], kid, extra);
 }
 
 void keyset_for_all_keyset(void (*cb)(int,void*), void *extra)
 {
-	int i;
+	int ks;
 
-	for (i = 0 ; i < keyset_count ; i ++)
-		if (keyuses[i / BITU] & (1U << (i % BITU)))
-			cb(i, extra);
+	for (ks = 0 ; ks < keyset_count ; ks ++)
+		if (!is_keyset_free(ks))
+			cb(ks, extra);
 }
 
-void keyset_for_all(int ks, void (*cb)(const char*,int,void*), void *extra)
+void keyset_for_all(int ks, void (*cb)(const char*,int,char,void*), void *extra)
 {
-	int i;
+	int kid;
 
-	for (i = 0 ; i < tag_count ; i++)
-		if (keysets[ks * keyset_size + (i / BITU)] & (1U << (i % BITU)))
-			cb(tag_strings[i], i, extra);
+	for (kid = 0 ; kid < tag_count ; kid++)
+		cb(tag_strings[kid], kid, keyset_get(ks, kid), extra);
+}
+
+void keyset_for_all_not_null(int ks, void (*cb)(const char*,int,char,void*), void *extra)
+{
+	int kid;
+	char value;
+
+	for (kid = 0 ; kid < tag_count ; kid++) {
+		value = keyset_get(ks, kid);
+		if (value)
+			cb(tag_strings[kid], kid, value, extra);
+	}
 }
 
