@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 
 #include "keyzen.h"
+#include "itoa.c"
 
 struct item {
 	char *entry;
@@ -121,38 +122,6 @@ static int ensure_mount_point()
 	if (mountlength == 0)
 		mountlength = detect_keyzen_mount_point(devname, mountpoint, (int)sizeof mountpoint);
 	return mountlength < 0 ? mountlength : 0;
-}
-
-static void itoa(int value, char *buffer)
-{
-	int i;
-	char c;
-
-	if (!value) {
-		buffer[0] = '0';
-		buffer[1] = 0;
-	} else {
-		if (value < 0) {
-			/* handling case of INTEGER_MINIMUM that has no positive value */
-			value = -value;
-			buffer[0] = '-';
-			buffer[1] = '0' + (char)(((unsigned)value) % 10);
-			value = (int)(((unsigned)value) / 10);
-			i = 2;
-		} else {
-			i = 0;
-		}
-		while (value) {
-			buffer[i++] = '0' + (char)(value % 10);
-			value /= 10;
-		}
-		buffer[i--] = 0;
-		while (value < i) {
-			c = buffer[value];
-			buffer[value++] = buffer[i];
-			buffer[i--] = c;
-		}
-	}
 }
 
 static const char *pidstr(pid_t pid)
@@ -556,7 +525,7 @@ int keyzen_list_keys_count(void *list)
 	return *(int*)list;
 }
 
-char *keyzen_list_keys_name(void *list, int index)
+const char *keyzen_list_keys_name(void *list, int index)
 {
 	int *ints;
 
@@ -566,6 +535,6 @@ char *keyzen_list_keys_name(void *list, int index)
 	if (index < 1 || index > *ints)
 		return 0;
 
-	return ((char*)list)+ints[index];
+	return ((const char*)list)+ints[index];
 }
 

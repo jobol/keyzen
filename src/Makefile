@@ -11,7 +11,9 @@ INCFS = procs.h keyset.h itoa.c
 
 OPTFS = $(shell pkg-config --cflags fuse) $(shell pkg-config --libs fuse)
 
-OPTFS += -g -Wall 
+OPTFS += -O3 -Wall 
+
+OPTFS += -DNOSECURITY=1
 
 keyzen-fs: keyzen-fs.c $(SRCFS) $(INCFS)
 	gcc $(OPTFS) -o $@ $< $(SRCFS)

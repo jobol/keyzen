@@ -21,8 +21,8 @@
 
 #include "itoa.c"
 
-#if !defined(NOTEST)
-#define NOTEST 0
+#if !defined(NOSECURITY)
+#define NOSECURITY 0
 #endif
 
 /* protecting accesses to procs and keyset features */
@@ -213,7 +213,7 @@ static int process_keys_may_have(struct process *process, const char *key)
 
 static int process_is_admin(struct process *process)
 {
-#if NOTEST
+#if !NOSECURITY
 	static int kid_admin = -1;
 
 	if (kid_admin < 0) {
@@ -652,7 +652,6 @@ static void send_read()
 	if (size) {
 		if (size > read_size)
 			size = read_size;
-printf("zzzzzzzzzzzz %d {%.*s}\n",(int)size,(int)size,read_buffer + read_pos);
 		sts = fuse_reply_buf(read_req, read_buffer + read_pos, size);
 		if (!sts)
 			read_pos = read_pos + size;
@@ -1193,7 +1192,7 @@ static void keyzen_unlink(fuse_req_t req, fuse_ino_t parent, const char *name)
 		process = find_process_pid(INODE_PID(parent));
 		if (!process) {
 			fuse_reply_err(req, ENOENT);
-#if NOTEST
+#if !NOSECURITY
 		} else if (process->pid != (int)fuse_req_ctx(req)->pid) {
 			fuse_reply_err(req, EPERM);
 #endif
@@ -1219,7 +1218,7 @@ static void keyzen_mknod(fuse_req_t req, fuse_ino_t parent, const char *name, mo
 		process = find_process_pid(INODE_PID(parent));
 		if (!process) {
 			fuse_reply_err(req, ENOENT);
-#if NOTEST
+#if !NOSECURITY
 		} else if (process->pid != (int)fuse_req_ctx(req)->pid) {
 			fuse_reply_err(req, EPERM);
 #endif
@@ -1253,7 +1252,6 @@ static void keyzen_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
 {
 	int sts;
 
-printf("yyyyyyyyyyyyyyyy\n");
 	if (ino != INODE_DIAL || dial_is_started() || (fi->flags & O_ACCMODE) != O_RDWR)
 		fuse_reply_err(req, EACCES);
 	else {
@@ -1262,7 +1260,6 @@ printf("yyyyyyyyyyyyyyyy\n");
 		sts = fuse_reply_open(req, fi);
 		if (sts)
 			dial_stop();
-printf("mmmmmmmmmmmmmmmm %d\n", sts);
 	}
 }
 
